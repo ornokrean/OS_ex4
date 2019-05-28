@@ -32,7 +32,7 @@ uint64_t getAddressAt(uint64_t paddress, int shift)
 
 uint64_t translateVaddress(uint64_t addr)
 {
-    return  0 ;
+
 
 }
 
@@ -51,8 +51,14 @@ bool isClear(uint64_t frameIndex)
     return true;
 }
 
+uint64_t findCyclicDistance(uint64_t page_num){ return 0;}
 
-uint64_t findMax(uint64_t frameIndex, uint64_t maxFrame)
+void findEmptyFrame(uint64_t frame, int vaddr){
+
+}
+
+
+uint64_t findMax(uint64_t frameIndex, uint64_t *maxFrame)
 {
     int word = 0;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
@@ -60,13 +66,14 @@ uint64_t findMax(uint64_t frameIndex, uint64_t maxFrame)
         PMread(frameIndex * PAGE_SIZE + i, &word);
         if (word != 0)
         {
-            if (word > maxFrame)
+            if (word > *maxFrame)
             {
-                maxFrame = uint64_t(word);
+                *maxFrame = uint64_t(word);
             }
-            maxFrame = findMax(uint64_t(word), maxFrame);
+            findMax(uint64_t(word), maxFrame);
         }
     }
+
 }
 
 uint64_t getFrame(uint64_t frame_index)
@@ -92,18 +99,19 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
             /*Restore from disk*/
             /*PMrestore(f, addr);*/
 
-        }
-        else
+        } else
         {
             /*Write 0's to all rows*/
             clearTable(uint64_t(f));
         }
         addr = int(f);
 
+        //TODO: what is this frame
         //Update the "parent" with the relevant frame index
         PMwrite(frame * PAGE_SIZE + paddr, addr);
 
     }
+
 
     return 0;
 }
@@ -111,7 +119,6 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
 
 void VMinitialize()
 {
-
     clearTable(0);
 }
 
