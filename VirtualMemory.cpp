@@ -54,12 +54,20 @@ bool isClear(uint64_t frameIndex)
 }
 
 
-
-uint64_t findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page)
+void findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page, uint64_t *maxFrame)
 {
+    //If reached actual page
     if (depth == TABLES_DEPTH)
     {
-        int cycDist = min(fixed_page - page_num, NUM_PAGES - (fixed_page - page_num));
+        //Calculate the minimal distance between the current page and the page to insert:
+        auto cycDist = min(fixed_page - page_num, NUM_PAGES - (fixed_page - page_num));
+
+        //Update the max distance frame if the new distance is larger:
+        if (cycDist > min(fixed_page - *maxFrame, NUM_PAGES - (fixed_page - *maxFrame)))
+        {
+            *maxFrame = page_num;
+            return;
+        }
     }
     page_num <<= OFFSET_WIDTH;
     int word = 0;
@@ -67,18 +75,23 @@ uint64_t findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, 
     {
         //Get the next frame
         PMread(frame_index * PAGE_SIZE + i, &word);
-        findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page);
+        if (word != 0)
+        {
+            findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page, maxFrame);
+        }
     }
 
 
 }
 
-void findEmptyFrame(uint64_t frame, int protectedFrame, uint64_t *clearFrame)
+void findEmptyFrame(uint64_t frame, uint64_t protectedFrame, uint64_t *clearFrame)
 {
+    // Empty frame found
     if (*clearFrame != -1)
     {
         return;
     }
+    //If the frame is empty and it is not the frame we don't want to use:
     if (isClear(frame) && frame != protectedFrame)
     {
         *clearFrame = frame;
@@ -88,7 +101,10 @@ void findEmptyFrame(uint64_t frame, int protectedFrame, uint64_t *clearFrame)
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
         PMread(frame * PAGE_SIZE + i, &word);
-        findEmptyFrame(uint64_t(word), protectedFrame, clearFrame);
+        if (word != 0)
+        {
+            findEmptyFrame(uint64_t(word), protectedFrame, clearFrame);
+        }
     }
 }
 
@@ -114,11 +130,16 @@ void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 
 }
 
-uint64_t getFrame(uint64_t frame_index, uint64_t protectedIndex)
+void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame)
+{
+
+}
+
+uint64_t getFrame(uint64_t protectedIndex)
 {
     //First Priority: Empty Frame
     auto emptyFrame = uint64_t(-1);
-    findEmptyFrame(0,protectedIndex, &emptyFrame);
+    findEmptyFrame(0, protectedIndex, &emptyFrame);
     if (emptyFrame != -1)
     {
 
@@ -149,7 +170,7 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
     if (addr == 0)
     {
         /*Find an unused frame or evict a page from some frame*/
-        uint64_t f = 0/*getFrame()*/;
+        uint64_t f = getFrame(frame);
 
         //Case: Actual Page table and not a page of page tables
         if (depth == TABLES_DEPTH)
@@ -167,7 +188,6 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
         //TODO: what is this frame
         //Update the "parent" with the relevant frame index
         PMwrite(frame * PAGE_SIZE + paddr, addr);
-
     }
 
 
