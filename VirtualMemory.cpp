@@ -13,27 +13,94 @@ void clearTable(uint64_t frameIndex)
 /*
  * Returns a part of the address at "spot" shift (from the left).
  * */
-int getAddressAt(int paddress, int shift)
+uint64_t getAddressAt(uint64_t paddress, int shift)
 {
     int bitAnd = (1 << OFFSET_WIDTH) - 1; //Creates 1^OFFSET_WIDTH
+    // For doing this with an array
 //    int addresses[TABLES_DEPTH + 1];
     int i = 0;
-    while (i < shift)
+    while (i < shift /*i<=TABLES_DEPtH*/)
     {
 //        addresses[i]= paddress & bitAnd;
         //Shift right by offset width to get the next spot:
         paddress = (paddress >> OFFSET_WIDTH);
         i++;
     }
-
     return (paddress & bitAnd);
 }
 
 
-void translateVaddress(uint64_t addr)
+uint64_t translateVaddress(uint64_t addr)
 {
-    int p = 0;
-    PMread(0 + addr, &p);
+
+
+}
+/*Returns true if the frame is empty*/
+bool isClear(uint64_t frameIndex)
+{
+    int w = 0;
+    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+    {
+        PMread(frameIndex * PAGE_SIZE + i, &w);
+        if (w != 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+uint64_t findMax(uint64_t frameIndex, uint64_t maxFrame){
+    int word = 0;
+    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+    {
+        PMread(frameIndex * PAGE_SIZE + i, &word);
+        if (word!=0){
+            if (word>maxFrame){
+                maxFrame=uint64_t(word);
+            }
+            maxFrame = findMax(uint64_t(word), maxFrame);
+        }
+    }
+}
+
+uint64_t getFrame(uint64_t frame_index)
+{
+    /*Traverse the tree in DFS, while saving the maximal frame index reached*/
+
+}
+
+uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
+{
+    int addr = 0;
+    PMread(frame * PAGE_SIZE + paddr, &addr);
+
+    //Case: Page Fault- handle importing frame
+    if (addr == 0)
+    {
+        /*Find an unused frame or evict a page from some frame*/
+        uint64_t f = 0/*getFrame()*/;
+
+        //Case: Actual Page table and not a page of page tables
+        if (depth == TABLES_DEPTH)
+        {
+            /*Restore from disk*/
+            /*PMrestore(f, addr);*/
+
+        } else
+        {
+            /*Write 0's to all rows*/
+            clearTable(uint64_t(f));
+        }
+        addr = int(f);
+
+        //Update the "parent" with the relevant frame index
+        PMwrite(frame * PAGE_SIZE + paddr, addr);
+
+    }
+
+    return 0;
 }
 
 
@@ -45,12 +112,27 @@ void VMinitialize()
 
 int VMread(uint64_t virtualAddress, word_t *value)
 {
+    uint64_t addr = translateVaddress(virtualAddress);
+    //Case: Virtual address cannot be mapped
+    if (addr < 0)
+    {
+        return 0;
+    }
+    PMread(addr * PAGE_SIZE + getAddressAt(virtualAddress, 0), value);
     return 1;
 }
 
 
 int VMwrite(uint64_t virtualAddress, word_t value)
 {
+    uint64_t addr = translateVaddress(virtualAddress);
+    //Case: Virtual address cannot be mapped
+    if (addr < 0)
+    {
+        return 0;
+    }
+    PMwrite(addr * PAGE_SIZE + getAddressAt(virtualAddress, 0), value);
+
     return 1;
 }
 
