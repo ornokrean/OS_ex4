@@ -41,7 +41,7 @@ bool isClear(uint64_t frameIndex)
 {
     int w = 0;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
-    {
+    { int
         PMread(frameIndex * PAGE_SIZE + i, &w);
         if (w != 0)
         {
@@ -51,10 +51,43 @@ bool isClear(uint64_t frameIndex)
     return true;
 }
 
-uint64_t findCyclicDistance(uint64_t page_num){ return 0;}
+uint64_t findCyclicDistance(uint64_t page_num, int depth = 0, uint64_t frame_index)
+{
+    page_num <<= OFFSET_WIDTH;
+    int word=0;
+    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+    {
 
-void findEmptyFrame(uint64_t frame, int vaddr){
+        findCyclicDistance(page_num + i, depth,i);
+    }
 
+    if (depth != TABLES_DEPTH)
+    {
+        findCyclicDistance(page_num, depth + 1);
+    }
+
+    return depth;
+}
+
+void findEmptyFrame(uint64_t frame, int protectedFrame, uint64_t *clearFrame)
+{
+// TODO REMEMBER RUTH WHEN CALLING
+// do some shit ROOTLESS
+    if (*clearFrame != -1)
+    {
+        return;
+    }
+    if (isClear(frame) && frame != protectedFrame)
+    {
+        *clearFrame = frame;
+        return;
+    }
+    int word = 0;
+    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+    {
+        PMread(frame * PAGE_SIZE + i, &word);
+        findEmptyFrame(uint64_t(word), protectedFrame, clearFrame);
+    }
 }
 
 
@@ -99,7 +132,8 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
             /*Restore from disk*/
             /*PMrestore(f, addr);*/
 
-        } else
+        }
+        else
         {
             /*Write 0's to all rows*/
             clearTable(uint64_t(f));
