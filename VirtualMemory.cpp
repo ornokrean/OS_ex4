@@ -68,6 +68,26 @@ uint64_t findCyclicDistance(uint64_t page_num, int depth = 0, uint64_t frame_ind
 
 }
 
+void findEmptyFrame(uint64_t frame, int protectedFrame, uint64_t *clearFrame)
+{
+// TODO REMEMBER RUTH WHEN CALLING
+// do some shit ROOTLESS
+    if (*clearFrame != -1)
+    {
+        return;
+    }
+    if (isClear(frame) && frame != protectedFrame)
+    {
+        *clearFrame = frame;
+        return;
+    }
+    int word = 0;
+    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+    {
+        PMread(frame * PAGE_SIZE + i, &word);
+        findEmptyFrame(uint64_t(word), protectedFrame, clearFrame);
+    }
+}
 
 
 /*
