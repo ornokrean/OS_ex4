@@ -29,3 +29,6 @@ int VMwrite(uint64_t virtualAddress, word_t value);
 
 
 void readAddress(uint64_t virtualAddress, std::vector<unsigned int long long> &address_vec);
+
+
+void printTree();
