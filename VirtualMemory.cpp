@@ -1,6 +1,9 @@
 #include "VirtualMemory.h"
 #include "PhysicalMemory.h"
 #include "string.h"
+#include <math.h>
+
+using namespace std;
 
 void clearTable(uint64_t frameIndex)
 {
@@ -32,8 +35,7 @@ uint64_t getAddressAt(uint64_t paddress, int shift)
 
 uint64_t translateVaddress(uint64_t addr)
 {
-
-
+    return 0;
 }
 
 /*Returns true if the frame is empty*/
@@ -51,27 +53,28 @@ bool isClear(uint64_t frameIndex)
     return true;
 }
 
-uint64_t findCyclicDistance(uint64_t page_num, int depth = 0, uint64_t frame_index)
+
+
+uint64_t findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page)
 {
+    if (depth == TABLES_DEPTH)
+    {
+        int cycDist = min(fixed_page - page_num, NUM_PAGES - (fixed_page - page_num));
+    }
     page_num <<= OFFSET_WIDTH;
-    int word=0;
+    int word = 0;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
-
-        findCyclicDistance(page_num + i, depth,i);
+        //Get the next frame
+        PMread(frame_index * PAGE_SIZE + i, &word);
+        findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page);
     }
 
-    if (depth != TABLES_DEPTH)
-    {
-        findCyclicDistance(page_num, depth + 1);
-    }
 
 }
 
 void findEmptyFrame(uint64_t frame, int protectedFrame, uint64_t *clearFrame)
 {
-// TODO REMEMBER RUTH WHEN CALLING
-// do some shit ROOTLESS
     if (*clearFrame != -1)
     {
         return;
@@ -115,8 +118,9 @@ uint64_t getFrame(uint64_t frame_index, uint64_t protectedIndex)
 {
     //First Priority: Empty Frame
     auto emptyFrame = uint64_t(-1);
-    findEmptyFrame(emptyFrame);
-    if (emptyFrame!=-1){
+    findEmptyFrame(0,protectedIndex, &emptyFrame);
+    if (emptyFrame != -1)
+    {
 
         return emptyFrame;
     }
@@ -124,8 +128,9 @@ uint64_t getFrame(uint64_t frame_index, uint64_t protectedIndex)
     uint64_t maxFrame = 0;
     findMax(0, &maxFrame);
     //Case: RAM not full yet
-    if (maxFrame+1<NUM_FRAMES){
-        return maxFrame+1;
+    if (maxFrame + 1 < NUM_FRAMES)
+    {
+        return maxFrame + 1;
     }
     //Third Priority: Evict a page:
 
