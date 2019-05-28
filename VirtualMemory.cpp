@@ -2,6 +2,8 @@
 #include "PhysicalMemory.h"
 #include "string.h"
 #include <math.h>
+#include <stdio.h>
+#include <iostream>
 
 using namespace std;
 
@@ -35,6 +37,7 @@ uint64_t getAddressAt(uint64_t paddress, int shift)
 
 uint64_t translateVaddress(uint64_t addr)
 {
+
     return 0;
 }
 
@@ -165,7 +168,6 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
 {
     int addr = 0;
     PMread(frame * PAGE_SIZE + paddr, &addr);
-
     //Case: Page Fault- handle importing frame
     if (addr == 0)
     {
@@ -177,15 +179,12 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
         {
             /*Restore from disk*/
             /*PMrestore(f, addr);*/
-
         } else
         {
             /*Write 0's to all rows*/
             clearTable(uint64_t(f));
         }
         addr = int(f);
-
-        //TODO: what is this frame
         //Update the "parent" with the relevant frame index
         PMwrite(frame * PAGE_SIZE + paddr, addr);
     }
@@ -273,11 +272,11 @@ void printSubTree(uint64_t root, int depth, bool isEmptyMode)
 	//father
 	for (int _ = 0; _ < depth; _++)
 	{
-		std::cout << '\t';
+		cout << '\t';
 	}
 	if (isEmptyMode)
 	{
-		std::cout << '_' << '\n';
+		cout << '_' << '\n';
 	} else
 	{
 		if (depth == TABLES_DEPTH - 1)
@@ -285,10 +284,10 @@ void printSubTree(uint64_t root, int depth, bool isEmptyMode)
 			word_t a, b;
 			PMread(root * PAGE_SIZE + 0, &a);
 			PMread(root * PAGE_SIZE + 1, &b);
-			std::cout << root << " -> (" << a << ',' << b << ")\n";
+			cout << root << " -> (" << a << ',' << b << ")\n";
 		} else
 		{
-			std::cout << root << '\n';
+			cout << root << '\n';
 		}
 	}
 
@@ -303,8 +302,8 @@ void printSubTree(uint64_t root, int depth, bool isEmptyMode)
 
 void printTree()
 {
-	std::cout << "---------------------" << '\n';
-	std::cout << "Virtual Memory:" << '\n';
+	cout << "---------------------" << '\n';
+	cout << "Virtual Memory:" << '\n';
 	printSubTree(0, 0, false);
-	std::cout << "---------------------" << '\n';
+	cout << "---------------------" << '\n';
 }
