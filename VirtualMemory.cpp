@@ -16,28 +16,26 @@ void clearTable(uint64_t frameIndex)
 }
 
 /*
- * Returns a part of the address at "spot" shift (from the left).
+ * Fills an int array with the p addresses and the offset.
  * */
-uint64_t getAddressAt(uint64_t paddress, int shift)
+void getAddressAt(uint64_t vAddress, uint64_t *addresses)
 {
     int bitAnd = (1 << OFFSET_WIDTH) - 1; //Creates 1^OFFSET_WIDTH
     // For doing this with an array
-//    int addresses[TABLES_DEPTH + 1];
-    int i = 0;
-    while (i < shift /*i<=TABLES_DEPtH*/)
+    int i = TABLES_DEPTH;
+    while (i >= 0)
     {
-//        addresses[i]= paddress & bitAnd;
+        addresses[i] = (vAddress & bitAnd);
         //Shift right by offset width to get the next spot:
-        paddress = (paddress >> OFFSET_WIDTH);
-        i++;
+        vAddress = (vAddress >> OFFSET_WIDTH);
+        i--;
     }
-    return (paddress & bitAnd);
+
 }
 
 
 uint64_t translateVaddress(uint64_t addr)
 {
-
     return 0;
 }
 
@@ -208,7 +206,7 @@ int VMread(uint64_t virtualAddress, word_t *value)
     {
         return 0;
     }
-    PMread(addr * PAGE_SIZE + getAddressAt(virtualAddress, 0), value);
+    PMread(addr * PAGE_SIZE /*+ getAddressAt(virtualAddress, 0)*/, value);
     return 1;
 }
 
@@ -221,7 +219,7 @@ int VMwrite(uint64_t virtualAddress, word_t value)
     {
         return 0;
     }
-    PMwrite(addr * PAGE_SIZE + getAddressAt(virtualAddress, 0), value);
+    PMwrite(addr * PAGE_SIZE /*+ getAddressAt(virtualAddress, 0)*/, value);
 
     return 1;
 }
@@ -254,56 +252,56 @@ int VMwrite(uint64_t virtualAddress, word_t value)
 
 void printSubTree(uint64_t root, int depth, bool isEmptyMode)
 {
-	if (depth == TABLES_DEPTH)
-	{
-		return;
-	}
-	word_t currValue = 0;
+    if (depth == TABLES_DEPTH)
+    {
+        return;
+    }
+    word_t currValue = 0;
 
-	if ((isEmptyMode || root == 0) && depth != 0)
-	{
-		isEmptyMode = true;
-	}
+    if ((isEmptyMode || root == 0) && depth != 0)
+    {
+        isEmptyMode = true;
+    }
 
-	//right son
-	PMread(root * PAGE_SIZE + 1, &currValue);
-	printSubTree(static_cast<uint64_t>(currValue), depth + 1, isEmptyMode);
+    //right son
+    PMread(root * PAGE_SIZE + 1, &currValue);
+    printSubTree(static_cast<uint64_t>(currValue), depth + 1, isEmptyMode);
 
-	//father
-	for (int _ = 0; _ < depth; _++)
-	{
-		cout << '\t';
-	}
-	if (isEmptyMode)
-	{
-		cout << '_' << '\n';
-	} else
-	{
-		if (depth == TABLES_DEPTH - 1)
-		{
-			word_t a, b;
-			PMread(root * PAGE_SIZE + 0, &a);
-			PMread(root * PAGE_SIZE + 1, &b);
-			cout << root << " -> (" << a << ',' << b << ")\n";
-		} else
-		{
-			cout << root << '\n';
-		}
-	}
+    //father
+    for (int _ = 0; _ < depth; _++)
+    {
+        cout << '\t';
+    }
+    if (isEmptyMode)
+    {
+        cout << '_' << '\n';
+    } else
+    {
+        if (depth == TABLES_DEPTH - 1)
+        {
+            word_t a, b;
+            PMread(root * PAGE_SIZE + 0, &a);
+            PMread(root * PAGE_SIZE + 1, &b);
+            cout << root << " -> (" << a << ',' << b << ")\n";
+        } else
+        {
+            cout << root << '\n';
+        }
+    }
 
 //left son
-	PMread(root
-		   * PAGE_SIZE + 0, &currValue);
-	printSubTree(static_cast
-						 <uint64_t>(currValue), depth
-												+ 1, isEmptyMode);
+    PMread(root
+           * PAGE_SIZE + 0, &currValue);
+    printSubTree(static_cast
+                         <uint64_t>(currValue), depth
+                                                + 1, isEmptyMode);
 
 }
 
 void printTree()
 {
-	cout << "---------------------" << '\n';
-	cout << "Virtual Memory:" << '\n';
-	printSubTree(0, 0, false);
-	cout << "---------------------" << '\n';
+    cout << "---------------------" << '\n';
+    cout << "Virtual Memory:" << '\n';
+    printSubTree(0, 0, false);
+    cout << "---------------------" << '\n';
 }
