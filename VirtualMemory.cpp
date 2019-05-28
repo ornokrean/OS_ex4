@@ -53,12 +53,15 @@ bool isClear(uint64_t frameIndex)
 
 uint64_t findCyclicDistance(uint64_t page_num){ return 0;}
 
-void findEmptyFrame(uint64_t frame, int vaddr){
+void findEmptyFrame(uint64_t frame){
 
 }
 
 
-uint64_t findMax(uint64_t frameIndex, uint64_t *maxFrame)
+/*
+ * Traverses the tree in DFS, and saves the max index of frames visited
+ * */
+void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 {
     int word = 0;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
@@ -73,12 +76,29 @@ uint64_t findMax(uint64_t frameIndex, uint64_t *maxFrame)
             findMax(uint64_t(word), maxFrame);
         }
     }
-
 }
 
-uint64_t getFrame(uint64_t frame_index)
+uint64_t getFrame(uint64_t frame_index, uint64_t protectedIndex)
 {
-    /*Traverse the tree in DFS, while saving the maximal frame index reached*/
+    //First Priority: Empty Frame
+    auto emptyFrame = uint64_t(-1);
+    findEmptyFrame(emptyFrame);
+    if (emptyFrame!=-1){
+
+        return emptyFrame;
+    }
+    //Second Priority: Unused Frame:
+    uint64_t maxFrame = 0;
+    findMax(0, &maxFrame);
+    //Case: RAM not full yet
+    if (maxFrame+1<NUM_FRAMES){
+        return maxFrame+1;
+    }
+    //Third Priority: Evict a page:
+
+
+
+
 
 }
 
