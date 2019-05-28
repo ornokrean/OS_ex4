@@ -242,3 +242,69 @@ int VMwrite(uint64_t virtualAddress, word_t value)
 
  #When traversing the tree, keep an index of the maximal frame visited
  */
+
+
+
+
+
+
+
+
+
+
+
+void printSubTree(uint64_t root, int depth, bool isEmptyMode)
+{
+	if (depth == TABLES_DEPTH)
+	{
+		return;
+	}
+	word_t currValue = 0;
+
+	if ((isEmptyMode || root == 0) && depth != 0)
+	{
+		isEmptyMode = true;
+	}
+
+	//right son
+	PMread(root * PAGE_SIZE + 1, &currValue);
+	printSubTree(static_cast<uint64_t>(currValue), depth + 1, isEmptyMode);
+
+	//father
+	for (int _ = 0; _ < depth; _++)
+	{
+		std::cout << '\t';
+	}
+	if (isEmptyMode)
+	{
+		std::cout << '_' << '\n';
+	} else
+	{
+		if (depth == TABLES_DEPTH - 1)
+		{
+			word_t a, b;
+			PMread(root * PAGE_SIZE + 0, &a);
+			PMread(root * PAGE_SIZE + 1, &b);
+			std::cout << root << " -> (" << a << ',' << b << ")\n";
+		} else
+		{
+			std::cout << root << '\n';
+		}
+	}
+
+//left son
+	PMread(root
+		   * PAGE_SIZE + 0, &currValue);
+	printSubTree(static_cast
+						 <uint64_t>(currValue), depth
+												+ 1, isEmptyMode);
+
+}
+
+void printTree()
+{
+	std::cout << "---------------------" << '\n';
+	std::cout << "Virtual Memory:" << '\n';
+	printSubTree(0, 0, false);
+	std::cout << "---------------------" << '\n';
+}
