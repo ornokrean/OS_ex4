@@ -41,7 +41,7 @@ bool isClear(uint64_t frameIndex)
 {
     int w = 0;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
-    { int
+    {
         PMread(frameIndex * PAGE_SIZE + i, &w);
         if (w != 0)
         {
@@ -66,32 +66,13 @@ uint64_t findCyclicDistance(uint64_t page_num, int depth = 0, uint64_t frame_ind
         findCyclicDistance(page_num, depth + 1);
     }
 
-    return depth;
-}
-
-void findEmptyFrame(uint64_t frame, int protectedFrame, uint64_t *clearFrame)
-{
-// TODO REMEMBER RUTH WHEN CALLING
-// do some shit ROOTLESS
-    if (*clearFrame != -1)
-    {
-        return;
-    }
-    if (isClear(frame) && frame != protectedFrame)
-    {
-        *clearFrame = frame;
-        return;
-    }
-    int word = 0;
-    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
-    {
-        PMread(frame * PAGE_SIZE + i, &word);
-        findEmptyFrame(uint64_t(word), protectedFrame, clearFrame);
-    }
 }
 
 
-uint64_t findMax(uint64_t frameIndex, uint64_t *maxFrame)
+/*
+ * Traverses the tree in DFS, and saves the max index of frames visited
+ * */
+void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 {
     int word = 0;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
@@ -109,9 +90,27 @@ uint64_t findMax(uint64_t frameIndex, uint64_t *maxFrame)
 
 }
 
-uint64_t getFrame(uint64_t frame_index)
+uint64_t getFrame(uint64_t frame_index, uint64_t protectedIndex)
 {
-    /*Traverse the tree in DFS, while saving the maximal frame index reached*/
+    //First Priority: Empty Frame
+    auto emptyFrame = uint64_t(-1);
+    findEmptyFrame(emptyFrame);
+    if (emptyFrame!=-1){
+
+        return emptyFrame;
+    }
+    //Second Priority: Unused Frame:
+    uint64_t maxFrame = 0;
+    findMax(0, &maxFrame);
+    //Case: RAM not full yet
+    if (maxFrame+1<NUM_FRAMES){
+        return maxFrame+1;
+    }
+    //Third Priority: Evict a page:
+
+
+
+
 
 }
 
@@ -132,8 +131,7 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
             /*Restore from disk*/
             /*PMrestore(f, addr);*/
 
-        }
-        else
+        } else
         {
             /*Write 0's to all rows*/
             clearTable(uint64_t(f));
