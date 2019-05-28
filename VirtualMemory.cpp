@@ -32,9 +32,10 @@ uint64_t getAddressAt(uint64_t paddress, int shift)
 
 uint64_t translateVaddress(uint64_t addr)
 {
-
+    return  0 ;
 
 }
+
 /*Returns true if the frame is empty*/
 bool isClear(uint64_t frameIndex)
 {
@@ -51,14 +52,17 @@ bool isClear(uint64_t frameIndex)
 }
 
 
-uint64_t findMax(uint64_t frameIndex, uint64_t maxFrame){
+uint64_t findMax(uint64_t frameIndex, uint64_t maxFrame)
+{
     int word = 0;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
         PMread(frameIndex * PAGE_SIZE + i, &word);
-        if (word!=0){
-            if (word>maxFrame){
-                maxFrame=uint64_t(word);
+        if (word != 0)
+        {
+            if (word > maxFrame)
+            {
+                maxFrame = uint64_t(word);
             }
             maxFrame = findMax(uint64_t(word), maxFrame);
         }
@@ -88,7 +92,8 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
             /*Restore from disk*/
             /*PMrestore(f, addr);*/
 
-        } else
+        }
+        else
         {
             /*Write 0's to all rows*/
             clearTable(uint64_t(f));
@@ -106,6 +111,7 @@ uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
 
 void VMinitialize()
 {
+
     clearTable(0);
 }
 

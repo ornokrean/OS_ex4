@@ -1,6 +1,8 @@
 #pragma once
 
 #include "MemoryConstants.h"
+#include <vector>
+
 
 /*
  * Initialize the virtual memory
@@ -14,7 +16,7 @@ void VMinitialize();
  * returns 0 on failure (if the address cannot be mapped to a physical
  * address for any reason)
  */
-int VMread(uint64_t virtualAddress, word_t* value);
+int VMread(uint64_t virtualAddress, word_t *value);
 
 /* writes a word to the given virtual address
  *
@@ -26,3 +28,4 @@ int VMread(uint64_t virtualAddress, word_t* value);
 int VMwrite(uint64_t virtualAddress, word_t value);
 
 
+void readAddress(uint64_t virtualAddress, std::vector<unsigned int long long> &address_vec);
