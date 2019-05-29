@@ -22,15 +22,21 @@ void getAddressParts(uint64_t vAddress, uint64_t *addresses)
 {
     int bitAnd = (1 << OFFSET_WIDTH) - 1; //Creates 1^OFFSET_WIDTH
     // For doing this with an array
-    int i = TABLES_DEPTH;
-    while (i >= 0)
+
+    for (int i = TABLES_DEPTH; i >= 0; --i)
     {
         addresses[i] = (vAddress & bitAnd);
         //Shift right by offset width to get the next spot:
+//        cout << vAddress << endl;
         vAddress = (vAddress >> OFFSET_WIDTH);
-        i--;
-    }
 
+    }
+//    cout << "ARRAY" << endl;
+//    for (int j = 0; j <= TABLES_DEPTH; ++j)
+//    {
+//
+//        cout << addresses[j] << endl;
+//    }
 }
 
 /*
@@ -143,12 +149,7 @@ void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
                   uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert)
 {
-    int word = 0;
-    //If the frame is empty and it is not the frame we don't want to use:
-    if (isClear(frameIndex) && frameIndex != protectedFrame)
-    {
-        *emptyFrame = frameIndex;
-    }
+
     if (depth == TABLES_DEPTH)
     {
         //Calculate the minimal distance between the current page and the page to insert:
@@ -159,6 +160,14 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
         }
         return;
     }
+    //If the frame is empty and it is not the frame we don't want to use:
+    if (isClear(frameIndex) && frameIndex != protectedFrame && frameIndex != 0)
+    {
+        *emptyFrame = frameIndex;
+    }
+
+    int word = 0;
+    constructedPageNum <<= OFFSET_WIDTH;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
         PMread(frameIndex * PAGE_SIZE + i, &word);
@@ -182,13 +191,13 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
 uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
 {
     //First Priority: Empty Frame
-    auto emptyFrame = uint64_t(-1);
+    uint64_t emptyFrame = 0;
     uint64_t maxFrame = 0;
     uint64_t cyclicFrame = 0;
     combinedFind(0, &emptyFrame, &maxFrame, &cyclicFrame, protectedFrame, 0, 0, page_num);
 
     //First Priority: Empty Frame
-    if (emptyFrame != -1)
+    if (emptyFrame > 0)
     {
         return emptyFrame;
     }
@@ -199,9 +208,11 @@ uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
         return maxFrame + 1;
     }
     //Third Priority: Evict a page:
-    if (cyclicFrame>0){
+    if (cyclicFrame > 0)
+    {
         return cyclicFrame;
     }
+    return 0;
 
 }
 
@@ -252,40 +263,41 @@ uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
 uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
 {
     int depth = 0;
-    int indexOfPageFrame = 0;
+    int pageWord = 0;
     uint64_t currentFrame = 0;
     uint64_t pageIndexInFrame = 0;
     //Run on each p in addresses- not including the offset d which is in the last spot
     while (depth < TABLES_DEPTH)
     {
         pageIndexInFrame = addresses[depth];
-        PMread(currentFrame * PAGE_SIZE + pageIndexInFrame, &indexOfPageFrame);
+        //cout << pageIndexInFrame << endl;
+        PMread(currentFrame * PAGE_SIZE + pageIndexInFrame, &pageWord);
         //Case: Page Fault- handle importing frame
-        if (indexOfPageFrame == 0)
+        if (pageWord == 0)
         {
             /*Find an unused frame or evict a page from some frame*/
-            uint64_t f = getFrame(currentFrame, page_num);
+            uint64_t frame = getFrame(currentFrame, page_num);
 
             //Case: Actual Page table and not a page of page tables
             if (depth + 1 == TABLES_DEPTH)
             {
                 /*Restore from disk*/
-                PMrestore(f, page_num);
+                PMrestore(frame, page_num);
             } else
             {
                 /*Write 0's to all rows*/
-                clearTable(uint64_t(f));
+                clearTable(uint64_t(frame));
             }
-            indexOfPageFrame = int(f);
+            pageWord = int(frame);
             //Update the "parent" with the relevant frame index
-            PMwrite(currentFrame * PAGE_SIZE + pageIndexInFrame, indexOfPageFrame);
+            PMwrite(currentFrame * PAGE_SIZE + pageIndexInFrame, pageWord);
         }
-        currentFrame = uint64_t(indexOfPageFrame);
+        currentFrame = uint64_t(pageWord);
         depth++;
     }
 
     //This is the resulting page we get from the loop: the index of the last page's frame
-    return uint64_t(indexOfPageFrame);
+    return uint64_t(pageWord);
 }
 
 void VMinitialize()
@@ -297,7 +309,7 @@ void VMinitialize()
 int VMread(uint64_t virtualAddress, word_t *value)
 {
     uint64_t paddresses[TABLES_DEPTH + 1];
-    getAddressParts((virtualAddress >> OFFSET_WIDTH), paddresses);
+    getAddressParts(virtualAddress, paddresses);
     uint64_t addr = translateVaddress(virtualAddress, paddresses);
     //Case: Virtual address cannot be mapped
     if (addr < 0)
@@ -312,7 +324,7 @@ int VMread(uint64_t virtualAddress, word_t *value)
 int VMwrite(uint64_t virtualAddress, word_t value)
 {
     uint64_t paddresses[TABLES_DEPTH + 1];
-    getAddressParts((virtualAddress >> OFFSET_WIDTH), paddresses);
+    getAddressParts(virtualAddress, paddresses);
     uint64_t addr = translateVaddress(virtualAddress, paddresses);
     //Case: Virtual address cannot be mapped
     if (addr < 0)
