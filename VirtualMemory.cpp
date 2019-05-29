@@ -277,7 +277,9 @@ uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
         {
             /*Find an unused frame or evict a page from some frame*/
             uint64_t frame = getFrame(currentFrame, page_num);
-
+            if (frame==0){
+                return 0;
+            }
             //Case: Actual Page table and not a page of page tables
             if (depth + 1 == TABLES_DEPTH)
             {
@@ -312,7 +314,7 @@ int VMread(uint64_t virtualAddress, word_t *value)
     getAddressParts(virtualAddress, paddresses);
     uint64_t addr = translateVaddress(virtualAddress, paddresses);
     //Case: Virtual address cannot be mapped
-    if (addr < 0)
+    if (addr < 1)
     {
         return 0;
     }
@@ -327,7 +329,7 @@ int VMwrite(uint64_t virtualAddress, word_t value)
     getAddressParts(virtualAddress, paddresses);
     uint64_t addr = translateVaddress(virtualAddress, paddresses);
     //Case: Virtual address cannot be mapped
-    if (addr < 0)
+    if (addr < 1)
     {
         return 0;
     }
