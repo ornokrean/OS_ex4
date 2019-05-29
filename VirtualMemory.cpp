@@ -163,7 +163,7 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
         //Calculate the minimal distance between the current page and the page to insert:
         //Update the max distance frame if the new distance is larger:
         if (*cyclicFrame == pageToInsert ||
-            calcCyclicDistance(constructedPageNum, pageToInsert) > calcCyclicDistance(*cyclicFrame, pageToInsert))
+            calcCyclicDistance(constructedPageNum, pageToInsert) < calcCyclicDistance(*cyclicFrame, pageToInsert))
         {
             *cyclicFrame = frameIndex;
             *cycPageNum = constructedPageNum;
@@ -258,7 +258,7 @@ uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
         {
             /*Find an unused frame or evict a page from some frame*/
             uint64_t frame = getFrame(currentFrame, page_num);
-//            printTree1();
+            printTree1();
             if (frame == 0)
             {
                 return 0;
