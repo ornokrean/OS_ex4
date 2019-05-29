@@ -69,88 +69,87 @@ uint64_t calcCyclicDistance(uint64_t from, uint64_t to)
 {
     return min(to - from, NUM_PAGES - (to - from));
 }
+//
+//void findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page,
+//                        uint64_t *currentMaxDistPage)
+//{
+//    //If reached actual page
+//    if (depth == TABLES_DEPTH)
+//    {
+//        //Calculate the minimal distance between the current page and the page to insert:
+//        //Update the max distance frame if the new distance is larger:
+//        if (calcCyclicDistance(page_num, fixed_page) > calcCyclicDistance(*currentMaxDistPage, fixed_page))
+//        {
+//            *currentMaxDistPage = page_num;
+//        }
+//        return;
+//    }
+//    // Update the page number - each round, we shift it OFFSET_WIDTH bits to the left to make room for the next "part"
+//    page_num <<= OFFSET_WIDTH;
+//    int word = 0;
+//
+//    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+//    {
+//        //Get the next frame
+//        PMread(frame_index * PAGE_SIZE + i, &word);
+//        if (word != 0)
+//        {
+//            findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page, currentMaxDistPage);
+//        }
+//    }
+//}
+//
+///*
+// * Finds an empty frame (a frame with 0 in all its rows) which is not the protected frame
+// * */
+//void findEmptyFrame(uint64_t frame, uint64_t protectedFrame, uint64_t *clearFrame)
+//{
+//    // Empty frame found - exit recursion
+//    if (*clearFrame != -1)
+//    {
+//        return;
+//    }
+//    //If the frame is empty and it is not the frame we don't want to use:
+//    if (isClear(frame) && frame != protectedFrame)
+//    {
+//        *clearFrame = frame;
+//        return;
+//    }
+//    int word = 0;
+//    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+//    {
+//        PMread(frame * PAGE_SIZE + i, &word);
+//        if (word != 0)
+//        {
+//            findEmptyFrame(uint64_t(word), protectedFrame, clearFrame);
+//        }
+//    }
+//}
+//
+///*
+// * Traverses the tree in DFS, and saves the max index of frames visited
+// * */
+//void findMax(uint64_t frameIndex, uint64_t *maxFrame)
+//{
+//    int word = 0;
+//    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+//    {
+//        PMread(frameIndex * PAGE_SIZE + i, &word);
+//        if (word != 0)
+//        {
+//            if (word > *maxFrame)
+//            {
+//                *maxFrame = uint64_t(word);
+//            }
+//            findMax(uint64_t(word), maxFrame);
+//        }
+//    }
+//
+//}
 
-void findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page,
-                        uint64_t *currentMaxDistPage)
-{
-    //If reached actual page
-    if (depth == TABLES_DEPTH)
-    {
-        //Calculate the minimal distance between the current page and the page to insert:
-        //Update the max distance frame if the new distance is larger:
-        if (calcCyclicDistance(page_num, fixed_page) > calcCyclicDistance(*currentMaxDistPage, fixed_page))
-        {
-            *currentMaxDistPage = page_num;
-        }
-        return;
-    }
-    // Update the page number - each round, we shift it OFFSET_WIDTH bits to the left to make room for the next "part"
-    page_num <<= OFFSET_WIDTH;
-    int word = 0;
-
-    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
-    {
-        //Get the next frame
-        PMread(frame_index * PAGE_SIZE + i, &word);
-        if (word != 0)
-        {
-            findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page, currentMaxDistPage);
-        }
-    }
-}
-
-/*
- * Finds an empty frame (a frame with 0 in all its rows) which is not the protected frame
- * */
-void findEmptyFrame(uint64_t frame, uint64_t protectedFrame, uint64_t *clearFrame)
-{
-    // Empty frame found - exit recursion
-    if (*clearFrame != -1)
-    {
-        return;
-    }
-    //If the frame is empty and it is not the frame we don't want to use:
-    if (isClear(frame) && frame != protectedFrame)
-    {
-        *clearFrame = frame;
-        return;
-    }
-    int word = 0;
-    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
-    {
-        PMread(frame * PAGE_SIZE + i, &word);
-        if (word != 0)
-        {
-            findEmptyFrame(uint64_t(word), protectedFrame, clearFrame);
-        }
-    }
-}
-
-/*
- * Traverses the tree in DFS, and saves the max index of frames visited
- * */
-void findMax(uint64_t frameIndex, uint64_t *maxFrame)
-{
-    int word = 0;
-    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
-    {
-        PMread(frameIndex * PAGE_SIZE + i, &word);
-        if (word != 0)
-        {
-            if (word > *maxFrame)
-            {
-                *maxFrame = uint64_t(word);
-            }
-            findMax(uint64_t(word), maxFrame);
-        }
-    }
-
-}
-
-//TODO: Currently only combines findMax and findEmptyFrame
-uint64_t combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
+void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
                       uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert,
-                      uint64_t *parent)
+                      uint64_t *parent, uint64_t cycPageNum)
 {
     //Found empty frame already, no need to continue search
     if (*emptyFrame > 0)
@@ -162,12 +161,12 @@ uint64_t combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFr
     {
         //Calculate the minimal distance between the current page and the page to insert:
         //Update the max distance frame if the new distance is larger:
-
         if (*cyclicFrame == pageToInsert ||
             calcCyclicDistance(constructedPageNum, pageToInsert) > calcCyclicDistance(*cyclicFrame, pageToInsert))
         {
             *cyclicFrame = frameIndex;
         }
+
         return constructedPageNum;
     }
     //If the frame is empty and it is not the frame we don't want to use:
@@ -177,7 +176,6 @@ uint64_t combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFr
         *emptyFrame = frameIndex;
         return 0;
     }
-
     *parent = frameIndex;
     int word = 0;
     uint64_t out = 0;
@@ -259,7 +257,7 @@ uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
         {
             /*Find an unused frame or evict a page from some frame*/
             uint64_t frame = getFrame(currentFrame, page_num);
-            printTree1();
+//            printTree1();
             if (frame == 0)
             {
                 return 0;
