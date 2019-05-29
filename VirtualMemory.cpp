@@ -18,7 +18,7 @@ void clearTable(uint64_t frameIndex)
 /*
  * Fills an int array with the p addresses and the offset.
  * */
-void getAddressAt(uint64_t vAddress, uint64_t *addresses)
+void getAddressParts(uint64_t vAddress, uint64_t *addresses)
 {
     int bitAnd = (1 << OFFSET_WIDTH) - 1; //Creates 1^OFFSET_WIDTH
     // For doing this with an array
@@ -38,26 +38,7 @@ void getAddressAt(uint64_t vAddress, uint64_t *addresses)
  * */
 uint64_t getPageNum(uint64_t vAddress)
 {
-    int bitAnd = (1 << OFFSET_WIDTH) - 1; //Creates 1^OFFSET_WIDTH
-    // For doing this with an array
-    int i = 0;
-    uint64_t page_num = 0;
-    vAddress = (vAddress >> OFFSET_WIDTH);
-
-//    while (i < TABLES_DEPTH)
-//    {
-//        page_num += vAddress & bitAnd;
-//        //Shift right by offset width to get the next spot:
-//        vAddress = (vAddress >> OFFSET_WIDTH);
-//        i++;
-//    }
-    return page_num;
-}
-
-
-uint64_t translateVaddress(uint64_t addr)
-{
-    return 0;
+    return vAddress >>= OFFSET_WIDTH;
 }
 
 
@@ -75,39 +56,45 @@ bool isClear(uint64_t frameIndex)
     }
     return true;
 }
+uint64_t calcCyclicDistance(uint64_t from, uint64_t to){
+    return min(to - from, NUM_PAGES - (to - from));
+}
 
-
-void findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page, uint64_t *maxFrame)
+void findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page,
+                        uint64_t *currentMaxDistPage)
 {
     //If reached actual page
     if (depth == TABLES_DEPTH)
     {
         //Calculate the minimal distance between the current page and the page to insert:
-        auto cycDist = min(fixed_page - page_num, NUM_PAGES - (fixed_page - page_num));
-
         //Update the max distance frame if the new distance is larger:
-        if (cycDist > min(fixed_page - *maxFrame, NUM_PAGES - (fixed_page - *maxFrame)))
+        if (calcCyclicDistance(page_num, fixed_page) > calcCyclicDistance(*currentMaxDistPage, fixed_page))
         {
-            *maxFrame = page_num;
-            return;
+            *currentMaxDistPage = page_num;
         }
+        return;
     }
+    // Update the page number - each round, we shift it OFFSET_WIDTH bits to the left to make room for the next "part"
     page_num <<= OFFSET_WIDTH;
     int word = 0;
+
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
         //Get the next frame
         PMread(frame_index * PAGE_SIZE + i, &word);
         if (word != 0)
         {
-            findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page, maxFrame);
+            findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page, currentMaxDistPage);
         }
     }
 }
 
+/*
+ * Finds an empty frame (a frame with 0 in all its rows) which is not the protected frame
+ * */
 void findEmptyFrame(uint64_t frame, uint64_t protectedFrame, uint64_t *clearFrame)
 {
-    // Empty frame found
+    // Empty frame found - exit recursion
     if (*clearFrame != -1)
     {
         return;
@@ -128,7 +115,6 @@ void findEmptyFrame(uint64_t frame, uint64_t protectedFrame, uint64_t *clearFram
         }
     }
 }
-
 
 /*
  * Traverses the tree in DFS, and saves the max index of frames visited
@@ -151,10 +137,10 @@ void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 
 }
 
+//TODO: Currently only combines findMax and findEmptyFrame
 void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
-        uint64_t protectedFrame)
+                  uint64_t protectedFrame)
 {
-
     int word = 0;
     //If the frame is empty and it is not the frame we don't want to use:
     if (isClear(frameIndex) && frameIndex != protectedFrame)
@@ -170,13 +156,17 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
             {
                 *maxFrame = uint64_t(word);
             }
-            findMax(uint64_t(word), maxFrame);
-            findEmptyFrame(uint64_t(word), protectedFrame, emptyFrame);
+            combinedFind(uint64_t(word), emptyFrame, maxFrame, cyclicFrame, protectedFrame);
         }
     }
 }
 
-uint64_t getFrame(uint64_t protectedIndex)
+/*
+ * Finds an available frame and returns its index
+ * Priority:
+ * Empty>Unused>Used(Needs evicting)
+ * */
+uint64_t getFrame(uint64_t protectedIndex, uint64_t page_num)
 {
     //First Priority: Empty Frame
     auto emptyFrame = uint64_t(-1);
@@ -194,38 +184,90 @@ uint64_t getFrame(uint64_t protectedIndex)
         return maxFrame + 1;
     }
     //Third Priority: Evict a page:
-
+    uint64_t currentMaxDistPage=0;
+    findCyclicDistance(0, 0, 0, page_num, &currentMaxDistPage);
 }
 
-uint64_t translate(uint64_t paddr, uint64_t frame, int depth)
-{
-    int addr = 0;
-    PMread(frame * PAGE_SIZE + paddr, &addr);
-    //Case: Page Fault- handle importing frame
-    if (addr == 0)
-    {
-        /*Find an unused frame or evict a page from some frame*/
-        uint64_t f = getFrame(frame);
+///*
+// * Recursively returns the frame index of paddr in frame.
+// * */
+////TODO: Can be non-recursive easily - replace with while loop with depth up to TABLES_DEPTH. May be better.
+////TODO: In this case, we need the array of p's instead of paddr
+//uint64_t translate(uint64_t paddr, uint64_t frame, int depth, uint64_t page_num)
+//{
+//    int addr = 0;
+//    PMread(frame * PAGE_SIZE + paddr, &addr);
+//    //Case: Page Fault- handle importing frame
+//    if (addr == 0)
+//    {
+//        /*Find an unused frame or evict a page from some frame*/
+//        uint64_t f = getFrame(frame, page_num);
+//
+//        //Case: Actual Page table and not a page of page tables
+//        if (depth == TABLES_DEPTH)
+//        {
+//            /*Restore from disk*/
+//            PMrestore(f, page_num);
+//        } else
+//        {
+//            /*Write 0's to all rows*/
+//            clearTable(uint64_t(f));
+//        }
+//        addr = int(f);
+//        //Update the "parent" with the relevant frame index
+//        PMwrite(frame * PAGE_SIZE + paddr, addr);
+//    }
+//    //paddr is the last part of the address- we reached a "real" page
+//    if (depth == TABLES_DEPTH)
+//    {
+//        //Return the frame number of the actual page in memory
+//        //TODO: outside, just use this frame with the offset to access the value
+//        return uint64_t(addr);
+//    }
+//    return /*translate(next p,uint64_t(addr))*/0;
+//}
 
-        //Case: Actual Page table and not a page of page tables
-        if (depth == TABLES_DEPTH)
+/*
+ * Returns the frame index of the given page_num
+ * */
+uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
+{
+    int depth = 0;
+    int indexOfPageFrame = 0;
+    uint64_t currentFrame = 0;
+    uint64_t pageIndexInFrame = 0;
+    //Run on each p in addresses- not including the offset d which is in the last spot
+    while (depth < TABLES_DEPTH)
+    {
+        pageIndexInFrame = addresses[depth];
+        PMread(currentFrame * PAGE_SIZE + pageIndexInFrame, &indexOfPageFrame);
+        //Case: Page Fault- handle importing frame
+        if (indexOfPageFrame == 0)
         {
-            /*Restore from disk*/
-            /*PMrestore(f, addr);*/
-        } else
-        {
-            /*Write 0's to all rows*/
-            clearTable(uint64_t(f));
+            /*Find an unused frame or evict a page from some frame*/
+            uint64_t f = getFrame(currentFrame, page_num);
+
+            //Case: Actual Page table and not a page of page tables
+            if (depth + 1 == TABLES_DEPTH)
+            {
+                /*Restore from disk*/
+                PMrestore(f, page_num);
+            } else
+            {
+                /*Write 0's to all rows*/
+                clearTable(uint64_t(f));
+            }
+            indexOfPageFrame = int(f);
+            //Update the "parent" with the relevant frame index
+            PMwrite(currentFrame * PAGE_SIZE + pageIndexInFrame, indexOfPageFrame);
         }
-        addr = int(f);
-        //Update the "parent" with the relevant frame index
-        PMwrite(frame * PAGE_SIZE + paddr, addr);
+        currentFrame = uint64_t(indexOfPageFrame);
+        depth++;
     }
 
-
-    return 0;
+    //This is the resulting page we get from the loop: the index of the last page's frame
+    return uint64_t(indexOfPageFrame);
 }
-
 
 void VMinitialize()
 {
@@ -235,31 +277,36 @@ void VMinitialize()
 
 int VMread(uint64_t virtualAddress, word_t *value)
 {
-    uint64_t addr = translateVaddress(virtualAddress);
+    uint64_t paddresses[TABLES_DEPTH + 1];
+    getAddressParts((virtualAddress >> OFFSET_WIDTH), paddresses);
+    uint64_t addr = translateVaddress(virtualAddress, paddresses);
     //Case: Virtual address cannot be mapped
     if (addr < 0)
     {
         return 0;
     }
-    PMread(addr * PAGE_SIZE /*+ getAddressAt(virtualAddress, 0)*/, value);
+    PMread(addr * PAGE_SIZE + paddresses[TABLES_DEPTH], value);
     return 1;
 }
 
 
 int VMwrite(uint64_t virtualAddress, word_t value)
 {
-    uint64_t addr = translateVaddress(virtualAddress);
+    uint64_t paddresses[TABLES_DEPTH + 1];
+    getAddressParts((virtualAddress >> OFFSET_WIDTH), paddresses);
+    uint64_t addr = translateVaddress(virtualAddress, paddresses);
     //Case: Virtual address cannot be mapped
     if (addr < 0)
     {
         return 0;
     }
-    PMwrite(addr * PAGE_SIZE /*+ getAddressAt(virtualAddress, 0)*/, value);
+    PMwrite(addr * PAGE_SIZE + paddresses[TABLES_DEPTH], value);
 
     return 1;
 }
 
 
+/*----------------------------------------- General Work Flow -----------------------------------------*/
 /*TODO Tasks:
     1. Split the input address correctly to separate parts: p1...pn,d.
     2. Write a DFS algorithm that searches for an empty frame
@@ -272,19 +319,10 @@ int VMwrite(uint64_t virtualAddress, word_t value)
                 one after the other. So, if max_frame_index+1<NUM_FRAMES then frame at index max_frame_index+1
 
 
- #When traversing the tree, keep an index of the maximal frame visited
+ #When traversing the tree, keep an index of the maximal frame visited and of the page visited
  */
 
-
-
-
-
-
-
-
-
-
-
+/*----------------------------------------- Tree Printer -----------------------------------------*/
 void printSubTree(uint64_t root, int depth, bool isEmptyMode)
 {
     if (depth == TABLES_DEPTH)
