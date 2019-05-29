@@ -7,7 +7,6 @@
 
 using namespace std;
 
-void printTree1();
 
 void clearTable(uint64_t frameIndex)
 {
@@ -68,7 +67,11 @@ bool isClear(uint64_t frameIndex)
 
 uint64_t calcCyclicDistance(uint64_t from, uint64_t to)
 {
-    return min(to - from, NUM_PAGES - (to - from));
+    if (to - from < NUM_PAGES - (to - from))
+    {
+        return to - from;
+    }
+    return NUM_PAGES - (to - from);
 }
 //
 //void findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint64_t fixed_page,
@@ -148,9 +151,10 @@ uint64_t calcCyclicDistance(uint64_t from, uint64_t to)
 //
 //}
 
-void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
-                  uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert,
-                  uint64_t parent, uint64_t *cycPageNum, uint64_t *stepParent)
+void
+combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
+             uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert,
+             uint64_t parent, uint64_t *cycPageNum, uint64_t *stepParent)
 {
     //Found empty frame already, no need to continue search
     if (*emptyFrame > 0)
@@ -163,7 +167,8 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
         //Calculate the minimal distance between the current page and the page to insert:
         //Update the max distance frame if the new distance is larger:
         if (*cyclicFrame == pageToInsert ||
-            calcCyclicDistance(constructedPageNum, pageToInsert) < calcCyclicDistance(*cyclicFrame, pageToInsert))
+            calcCyclicDistance(constructedPageNum, pageToInsert) <
+            calcCyclicDistance(*cyclicFrame, pageToInsert))
         {
             *cyclicFrame = frameIndex;
             *cycPageNum = constructedPageNum;
@@ -216,7 +221,6 @@ uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
     //First Priority: Empty Frame
     if (emptyFrame > 0)
     {
-
         return emptyFrame;
     }
     //Second Priority: Unused Frame:
@@ -258,7 +262,6 @@ uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
         {
             /*Find an unused frame or evict a page from some frame*/
             uint64_t frame = getFrame(currentFrame, page_num);
-            printTree1();
             if (frame == 0)
             {
                 return 0;
@@ -268,7 +271,8 @@ uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
             {
                 /*Restore from disk*/
                 PMrestore(frame, page_num);
-            } else
+            }
+            else
             {
                 /*Write 0's to all rows*/
                 clearTable(uint64_t(frame));
@@ -367,7 +371,8 @@ void printSubTree1(uint64_t root, int depth, bool isEmptyMode)
     if (isEmptyMode)
     {
         std::cout << '_' << '\n';
-    } else
+    }
+    else
     {
         if (depth == TABLES_DEPTH - 1)
         {
@@ -375,7 +380,8 @@ void printSubTree1(uint64_t root, int depth, bool isEmptyMode)
             PMread(root * PAGE_SIZE + 0, &a);
             PMread(root * PAGE_SIZE + 1, &b);
             std::cout << root << " -> (" << a << ',' << b << ")\n";
-        } else
+        }
+        else
         {
             std::cout << root << '\n';
         }

@@ -3,5 +3,6 @@ project(OS_Ex4)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_executable(OS_Ex4 FlowExampleSimulation.cpp VirtualMemory.cpp VirtualMemory.h PhysicalMemory.cpp PhysicalMemory.h
+add_executable(OS_Ex4 tester.cpp VirtualMemory.cpp VirtualMemory.h PhysicalMemory.cpp
+        PhysicalMemory.h
         MemoryConstants.h)
