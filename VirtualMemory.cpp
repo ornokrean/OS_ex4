@@ -6,6 +6,7 @@
 #include <iostream>
 
 using namespace std;
+
 void printTree1();
 
 void clearTable(uint64_t frameIndex)
@@ -148,13 +149,13 @@ uint64_t calcCyclicDistance(uint64_t from, uint64_t to)
 //}
 
 void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
-                      uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert,
-                      uint64_t *parent, uint64_t cycPageNum)
+                  uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert,
+                  uint64_t parent, uint64_t *cycPageNum, uint64_t *stepParent)
 {
     //Found empty frame already, no need to continue search
     if (*emptyFrame > 0)
     {
-        return 0;
+        return;
     }
     //
     if (depth == TABLES_DEPTH)
@@ -165,20 +166,20 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
             calcCyclicDistance(constructedPageNum, pageToInsert) > calcCyclicDistance(*cyclicFrame, pageToInsert))
         {
             *cyclicFrame = frameIndex;
+            *cycPageNum = constructedPageNum;
+            *stepParent = parent;
         }
-
-        return constructedPageNum;
+        return;
     }
     //If the frame is empty and it is not the frame we don't want to use:
     if (isClear(frameIndex) && frameIndex != protectedFrame && frameIndex != 0)
     {
-        PMwrite(*parent * PAGE_SIZE + getOFFSET(constructedPageNum), 0);
+        PMwrite(parent * PAGE_SIZE + getOFFSET(constructedPageNum), 0);
         *emptyFrame = frameIndex;
-        return 0;
+        return;
     }
-    *parent = frameIndex;
+
     int word = 0;
-    uint64_t out = 0;
     constructedPageNum <<= OFFSET_WIDTH;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
@@ -189,12 +190,11 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
             {
                 *maxFrame = uint64_t(word);
             }
-            out = combinedFind(uint64_t(word), emptyFrame, maxFrame, cyclicFrame, protectedFrame,
-                               constructedPageNum + i,
-                               depth + 1, pageToInsert, parent);
+            combinedFind(uint64_t(word), emptyFrame, maxFrame, cyclicFrame, protectedFrame,
+                         constructedPageNum + i,
+                         depth + 1, pageToInsert, frameIndex, cycPageNum, stepParent);
         }
     }
-    return out;
 }
 
 /*
@@ -209,8 +209,9 @@ uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
     uint64_t maxFrame = 0;
     uint64_t cyclicFrame = page_num;
     uint64_t parent = 0;
-    uint64_t cyclicPageNum = combinedFind(0, &emptyFrame, &maxFrame, &cyclicFrame, protectedFrame, 0, 0, page_num,
-                                          &parent);
+    uint64_t cyclicPageNum = 0;
+    combinedFind(0, &emptyFrame, &maxFrame, &cyclicFrame, protectedFrame, 0, 0, page_num,
+                 0, &cyclicPageNum, &parent);
 
     //First Priority: Empty Frame
     if (emptyFrame > 0)
