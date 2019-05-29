@@ -56,7 +56,9 @@ bool isClear(uint64_t frameIndex)
     }
     return true;
 }
-uint64_t calcCyclicDistance(uint64_t from, uint64_t to){
+
+uint64_t calcCyclicDistance(uint64_t from, uint64_t to)
+{
     return min(to - from, NUM_PAGES - (to - from));
 }
 
@@ -139,13 +141,23 @@ void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 
 //TODO: Currently only combines findMax and findEmptyFrame
 void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
-                  uint64_t protectedFrame)
+                  uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert)
 {
     int word = 0;
     //If the frame is empty and it is not the frame we don't want to use:
     if (isClear(frameIndex) && frameIndex != protectedFrame)
     {
         *emptyFrame = frameIndex;
+    }
+    if (depth == TABLES_DEPTH)
+    {
+        //Calculate the minimal distance between the current page and the page to insert:
+        //Update the max distance frame if the new distance is larger:
+        if (calcCyclicDistance(constructedPageNum, pageToInsert) > calcCyclicDistance(*cyclicFrame, pageToInsert))
+        {
+            *cyclicFrame = constructedPageNum;
+        }
+        return;
     }
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
@@ -156,7 +168,8 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
             {
                 *maxFrame = uint64_t(word);
             }
-            combinedFind(uint64_t(word), emptyFrame, maxFrame, cyclicFrame, protectedFrame);
+            combinedFind(uint64_t(word), emptyFrame, maxFrame, cyclicFrame, protectedFrame, constructedPageNum + i,
+                         depth + 1, pageToInsert);
         }
     }
 }
@@ -166,26 +179,30 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
  * Priority:
  * Empty>Unused>Used(Needs evicting)
  * */
-uint64_t getFrame(uint64_t protectedIndex, uint64_t page_num)
+uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
 {
     //First Priority: Empty Frame
     auto emptyFrame = uint64_t(-1);
-    findEmptyFrame(0, protectedIndex, &emptyFrame);
+    uint64_t maxFrame = 0;
+    uint64_t cyclicFrame = 0;
+    combinedFind(0, &emptyFrame, &maxFrame, &cyclicFrame, protectedFrame, 0, 0, page_num);
+
+    //First Priority: Empty Frame
     if (emptyFrame != -1)
     {
         return emptyFrame;
     }
     //Second Priority: Unused Frame:
-    uint64_t maxFrame = 0;
-    findMax(0, &maxFrame);
     //Case: RAM not full yet
     if (maxFrame + 1 < NUM_FRAMES)
     {
         return maxFrame + 1;
     }
     //Third Priority: Evict a page:
-    uint64_t currentMaxDistPage=0;
-    findCyclicDistance(0, 0, 0, page_num, &currentMaxDistPage);
+    if (cyclicFrame>0){
+        return cyclicFrame;
+    }
+
 }
 
 ///*
@@ -227,6 +244,8 @@ uint64_t getFrame(uint64_t protectedIndex, uint64_t page_num)
 //    return /*translate(next p,uint64_t(addr))*/0;
 //}
 
+
+//TODO: Important!!!!!! When moving an emprty frame or evicting a page
 /*
  * Returns the frame index of the given page_num
  * */
