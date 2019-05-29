@@ -6,6 +6,7 @@
 #include <iostream>
 
 using namespace std;
+void printTree1();
 
 void clearTable(uint64_t frameIndex)
 {
@@ -147,37 +148,39 @@ void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 }
 
 //TODO: Currently only combines findMax and findEmptyFrame
-void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
-                  uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert,
-                  uint64_t *parent)
+uint64_t combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
+                      uint64_t protectedFrame, uint64_t constructedPageNum, int depth, uint64_t pageToInsert,
+                      uint64_t *parent)
 {
     //Found empty frame already, no need to continue search
     if (*emptyFrame > 0)
     {
-        return;
+        return 0;
     }
     //
     if (depth == TABLES_DEPTH)
     {
         //Calculate the minimal distance between the current page and the page to insert:
         //Update the max distance frame if the new distance is larger:
-        if (calcCyclicDistance(constructedPageNum, pageToInsert) > calcCyclicDistance(*cyclicFrame, pageToInsert))
+
+        if (*cyclicFrame == pageToInsert ||
+            calcCyclicDistance(constructedPageNum, pageToInsert) > calcCyclicDistance(*cyclicFrame, pageToInsert))
         {
-            PMwrite(*parent*PAGE_SIZE + getOFFSET(constructedPageNum), 0);
-            *cyclicFrame = constructedPageNum;
+            *cyclicFrame = frameIndex;
         }
-        return;
+        return constructedPageNum;
     }
     //If the frame is empty and it is not the frame we don't want to use:
     if (isClear(frameIndex) && frameIndex != protectedFrame && frameIndex != 0)
     {
-        PMwrite(*parent*PAGE_SIZE + getOFFSET(constructedPageNum), 0);
+        PMwrite(*parent * PAGE_SIZE + getOFFSET(constructedPageNum), 0);
         *emptyFrame = frameIndex;
-        return;
+        return 0;
     }
 
     *parent = frameIndex;
     int word = 0;
+    uint64_t out = 0;
     constructedPageNum <<= OFFSET_WIDTH;
     for (uint64_t i = 0; i < PAGE_SIZE; ++i)
     {
@@ -188,10 +191,12 @@ void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame,
             {
                 *maxFrame = uint64_t(word);
             }
-            combinedFind(uint64_t(word), emptyFrame, maxFrame, cyclicFrame, protectedFrame, constructedPageNum + i,
-                         depth + 1, pageToInsert, parent);
+            out = combinedFind(uint64_t(word), emptyFrame, maxFrame, cyclicFrame, protectedFrame,
+                               constructedPageNum + i,
+                               depth + 1, pageToInsert, parent);
         }
     }
+    return out;
 }
 
 /*
@@ -204,9 +209,10 @@ uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
     //First Priority: Empty Frame
     uint64_t emptyFrame = 0;
     uint64_t maxFrame = 0;
-    uint64_t cyclicFrame = 0;
+    uint64_t cyclicFrame = page_num;
     uint64_t parent = 0;
-    combinedFind(0, &emptyFrame, &maxFrame, &cyclicFrame, protectedFrame, 0, 0, page_num, &parent);
+    uint64_t cyclicPageNum = combinedFind(0, &emptyFrame, &maxFrame, &cyclicFrame, protectedFrame, 0, 0, page_num,
+                                          &parent);
 
     //First Priority: Empty Frame
     if (emptyFrame > 0)
@@ -223,6 +229,8 @@ uint64_t getFrame(uint64_t protectedFrame, uint64_t page_num)
     //Third Priority: Evict a page:
     if (cyclicFrame > 0)
     {
+        PMevict(cyclicFrame, cyclicPageNum);
+        PMwrite(parent * PAGE_SIZE + getOFFSET(cyclicPageNum), 0);
         return cyclicFrame;
     }
     return 0;
@@ -251,6 +259,7 @@ uint64_t translateVaddress(const uint64_t page_num, const uint64_t *addresses)
         {
             /*Find an unused frame or evict a page from some frame*/
             uint64_t frame = getFrame(currentFrame, page_num);
+            printTree1();
             if (frame == 0)
             {
                 return 0;
@@ -330,3 +339,62 @@ int VMwrite(uint64_t virtualAddress, word_t value)
  #When traversing the tree, keep an index of the maximal frame visited and of the page visited
  */
 
+
+/*
+ * helper for printTree
+ */
+void printSubTree1(uint64_t root, int depth, bool isEmptyMode)
+{
+    if (depth == TABLES_DEPTH)
+    {
+        return;
+    }
+    word_t currValue = 0;
+
+    if ((isEmptyMode || root == 0) && depth != 0)
+    {
+        isEmptyMode = true;
+    }
+
+    //right son
+    PMread(root * PAGE_SIZE + 1, &currValue);
+    printSubTree1(static_cast<uint64_t>(currValue), depth + 1, isEmptyMode);
+
+    //father
+    for (int _ = 0; _ < depth; _++)
+    {
+        std::cout << '\t';
+    }
+    if (isEmptyMode)
+    {
+        std::cout << '_' << '\n';
+    } else
+    {
+        if (depth == TABLES_DEPTH - 1)
+        {
+            word_t a, b;
+            PMread(root * PAGE_SIZE + 0, &a);
+            PMread(root * PAGE_SIZE + 1, &b);
+            std::cout << root << " -> (" << a << ',' << b << ")\n";
+        } else
+        {
+            std::cout << root << '\n';
+        }
+    }
+
+    //left son
+    PMread(root
+           * PAGE_SIZE + 0, &currValue);
+    printSubTree1(static_cast <uint64_t>(currValue), depth + 1, isEmptyMode);
+}
+
+/**
+ * print's the virtual memory tree. feel free to use this function is Virtual Memory for debuging.
+ */
+void printTree1()
+{
+    std::cout << "---------------------" << '\n';
+    std::cout << "Virtual Memory:" << '\n';
+    printSubTree1(0, 0, false);
+    std::cout << "---------------------" << '\n';
+}
