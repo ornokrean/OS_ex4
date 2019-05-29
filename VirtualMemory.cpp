@@ -33,11 +33,33 @@ void getAddressAt(uint64_t vAddress, uint64_t *addresses)
 
 }
 
+/*
+ * Returns the page number from the Virtual address
+ * */
+uint64_t getPageNum(uint64_t vAddress)
+{
+    int bitAnd = (1 << OFFSET_WIDTH) - 1; //Creates 1^OFFSET_WIDTH
+    // For doing this with an array
+    int i = 0;
+    uint64_t page_num = 0;
+    vAddress = (vAddress >> OFFSET_WIDTH);
+
+//    while (i < TABLES_DEPTH)
+//    {
+//        page_num += vAddress & bitAnd;
+//        //Shift right by offset width to get the next spot:
+//        vAddress = (vAddress >> OFFSET_WIDTH);
+//        i++;
+//    }
+    return page_num;
+}
+
 
 uint64_t translateVaddress(uint64_t addr)
 {
     return 0;
 }
+
 
 /*Returns true if the frame is empty*/
 bool isClear(uint64_t frameIndex)
@@ -81,8 +103,6 @@ void findCyclicDistance(uint64_t page_num, int depth, uint64_t frame_index, uint
             findCyclicDistance(page_num + i, depth + 1, uint64_t(word), fixed_page, maxFrame);
         }
     }
-
-
 }
 
 void findEmptyFrame(uint64_t frame, uint64_t protectedFrame, uint64_t *clearFrame)
@@ -131,9 +151,29 @@ void findMax(uint64_t frameIndex, uint64_t *maxFrame)
 
 }
 
-void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame)
+void combinedFind(uint64_t frameIndex, uint64_t *emptyFrame, uint64_t *maxFrame, uint64_t *cyclicFrame,
+        uint64_t protectedFrame)
 {
 
+    int word = 0;
+    //If the frame is empty and it is not the frame we don't want to use:
+    if (isClear(frameIndex) && frameIndex != protectedFrame)
+    {
+        *emptyFrame = frameIndex;
+    }
+    for (uint64_t i = 0; i < PAGE_SIZE; ++i)
+    {
+        PMread(frameIndex * PAGE_SIZE + i, &word);
+        if (word != 0)
+        {
+            if (word > *maxFrame)
+            {
+                *maxFrame = uint64_t(word);
+            }
+            findMax(uint64_t(word), maxFrame);
+            findEmptyFrame(uint64_t(word), protectedFrame, emptyFrame);
+        }
+    }
 }
 
 uint64_t getFrame(uint64_t protectedIndex)
@@ -143,7 +183,6 @@ uint64_t getFrame(uint64_t protectedIndex)
     findEmptyFrame(0, protectedIndex, &emptyFrame);
     if (emptyFrame != -1)
     {
-
         return emptyFrame;
     }
     //Second Priority: Unused Frame:
@@ -155,10 +194,6 @@ uint64_t getFrame(uint64_t protectedIndex)
         return maxFrame + 1;
     }
     //Third Priority: Evict a page:
-
-
-
-
 
 }
 
